@@ -1,0 +1,1 @@
+//Handles termios raw mode, history navigation, and autocomplete. It accepts a ShellContext and returns a clean, raw char* buffer.c
