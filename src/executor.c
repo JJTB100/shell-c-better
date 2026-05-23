@@ -1,4 +1,5 @@
 #include "executor.h"
+#include "builtins.h"
 #include <stdio.h>
 
 void execute_command(ShellContext *ctx, TokenList *tokens) {
