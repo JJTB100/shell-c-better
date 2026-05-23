@@ -13,15 +13,19 @@ int main(void) {
     ShellContext ctx;
     shell_context_init(&ctx);
 
-    terminal_enable_raw_mode(&ctx);
-    
     while (ctx.is_running) {
         if (ctx.is_interactive) {
+            terminal_enable_raw_mode(&ctx);
             printf("$ ");
             fflush(stdout);
         }
 
         char *line = read_line(&ctx);
+
+        if (ctx.is_interactive) {
+            terminal_disable_raw_mode(&ctx);
+        }
+
         if (!line) {
             ctx.is_running = false;
             break;

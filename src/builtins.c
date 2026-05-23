@@ -156,39 +156,32 @@ static int builtin_cd(ShellContext *ctx, Command *cmd) {
 static int builtin_complete(ShellContext *ctx, Command *cmd) {
     (void)ctx;
     
-    // 1. No arguments: Print all specifications
     if (cmd->argc < 2) {
         print_completions(NULL);
         return 0;
     }
     
-    // 2. Print Flag (-p)
     if (strcmp(cmd->argv[1], "-p") == 0) {
-        if (cmd->argc > 2) {
-            print_completions(cmd->argv[2]); // Print specific
-        } else {
-            print_completions(NULL); // Print all
-        }
+        if (cmd->argc > 2) print_completions(cmd->argv[2]); 
+        else print_completions(NULL);
         return 0;
     }
     
-    // 3. Register Specification (-W or -C)
-    if (cmd->argc >= 4) {
-        CompType type;
-        if (strcmp(cmd->argv[1], "-W") == 0) {
-            type = COMP_WORDLIST;
-        } else if (strcmp(cmd->argv[1], "-C") == 0) {
-            type = COMP_COMMAND;
-        } else {
-            fprintf(stderr, "complete: unsupported flag %s\n", cmd->argv[1]);
-            return 1;
-        }
-        
-        // argv[3] is the target command, argv[2] is the wordlist/generator command
+    if (strcmp(cmd->argv[1], "-f") == 0 || strcmp(cmd->argv[1], "-d") == 0) {
+        if (cmd->argc < 3) goto usage;
+        CompType type = (strcmp(cmd->argv[1], "-f") == 0) ? COMP_FILE : COMP_DIR;
+        register_completion(cmd->argv[2], type, NULL);
+        return 0;
+    }
+
+    if (strcmp(cmd->argv[1], "-W") == 0 || strcmp(cmd->argv[1], "-C") == 0) {
+        if (cmd->argc < 4) goto usage;
+        CompType type = (strcmp(cmd->argv[1], "-W") == 0) ? COMP_WORDLIST : COMP_COMMAND;
         register_completion(cmd->argv[3], type, cmd->argv[2]);
         return 0;
     }
     
-    fprintf(stderr, "Usage: complete [-p] | [-W \"wordlist\" command] | [-C \"command\" command]\n");
+usage:
+    fprintf(stderr, "Usage: complete [-p] | [-f command] | [-d command] | [-W \"wordlist\" command] | [-C \"command\" command]\n");
     return 1;
 }
