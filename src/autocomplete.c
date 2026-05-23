@@ -128,6 +128,28 @@ static void generate_fs_matches(char ***matches, int *count, int *capacity, cons
     }
 }
 
+bool remove_completion(const char *command) {
+    for (int i = 0; i < custom_count; i++) {
+        if (strcmp(custom_completions[i].command, command) == 0) {
+            
+            // Free allocated memory
+            free(custom_completions[i].command);
+            if (custom_completions[i].arg) {
+                free(custom_completions[i].arg);
+            }
+
+            // Shift the remaining elements down
+            for (int j = i; j < custom_count - 1; j++) {
+                custom_completions[j] = custom_completions[j + 1];
+            }
+
+            custom_count--;
+            return true;
+        }
+    }
+    return false;
+}
+
 char **get_autocomplete_matches(const char *buffer, int *match_count, int *prefix_pos) {
     int capacity = 10;
     int count = 0;
@@ -212,12 +234,10 @@ char **get_autocomplete_matches(const char *buffer, int *match_count, int *prefi
                     snprintf(sys_cmd, sizeof(sys_cmd), "%s \"%s\" \"%s\" \"%s\"", 
                              custom_completions[i].arg, base_cmd, word, prev_word);
                     
-                    // --- NEW: Set completion environment variables ---
                     char point_str[32];
                     snprintf(point_str, sizeof(point_str), "%zu", strlen(buffer));
                     setenv("COMP_LINE", buffer, 1);
                     setenv("COMP_POINT", point_str, 1);
-                    // -------------------------------------------------
 
                     FILE *fp = popen(sys_cmd, "r");
                     if (fp) {
@@ -231,10 +251,8 @@ char **get_autocomplete_matches(const char *buffer, int *match_count, int *prefi
                         pclose(fp);
                     }
 
-                    // --- NEW: Clean up the environment variables ---
                     unsetenv("COMP_LINE");
                     unsetenv("COMP_POINT");
-                    // -----------------------------------------------
                 }
                 else if (custom_completions[i].type == COMP_FILE) {
                     generate_fs_matches(&matches, &count, &capacity, word, false);

@@ -17,4 +17,7 @@ void free_autocomplete_matches(char **matches, int match_count);
 void register_completion(const char *command, CompType type, const char *arg);
 bool print_completions(const char *target_command);
 
+// New removal function
+bool remove_completion(const char *command);
+
 #endif

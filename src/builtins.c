@@ -164,10 +164,22 @@ static int builtin_complete(ShellContext *ctx, Command *cmd) {
     if (strcmp(cmd->argv[1], "-p") == 0) {
         if (cmd->argc > 2) {
             if (!print_completions(cmd->argv[2])) {
-                return 1; // Return failure if no spec was found
+                return 1;
             }
         } else {
             print_completions(NULL);
+        }
+        return 0;
+    }
+
+    if (strcmp(cmd->argv[1], "-r") == 0) {
+        if (cmd->argc < 3) {
+            fprintf(stderr, "complete: -r: option requires an argument\n");
+            return 1;
+        }
+        if (!remove_completion(cmd->argv[2])) {
+            printf("complete: %s: no completion specification\n", cmd->argv[2]);
+            return 1;
         }
         return 0;
     }
@@ -187,6 +199,7 @@ static int builtin_complete(ShellContext *ctx, Command *cmd) {
     }
     
 usage:
-    fprintf(stderr, "Usage: complete [-p] | [-f command] | [-d command] | [-W \"wordlist\" command] | [-C \"command\" command]\n");
+    // Updated usage string to include -r
+    fprintf(stderr, "Usage: complete [-p] | [-r command] | [-f command] | [-d command] | [-W \"wordlist\" command] | [-C \"command\" command]\n");
     return 1;
 }
