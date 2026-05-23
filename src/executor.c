@@ -4,6 +4,10 @@
 void execute_command(ShellContext *ctx, TokenList *tokens) {
     if (tokens->count == 0) return;
 
+    if (handle_builtin(ctx, tokens)) {
+        return; // The built-in ran successfully
+    }
+
     char *command = tokens->tokens[0];
 
     // TODO: Builtins and PATH resolution will be checked here later.
