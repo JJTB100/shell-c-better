@@ -6,8 +6,36 @@
 #include <sys/stat.h>
 #include <stdio.h>
 
+typedef struct {
+    char *command;
+    char *wordlist;
+} CustomCompletion;
+
+static CustomCompletion *custom_completions = NULL;
+static int custom_count = 0;
+static int custom_capacity = 0;
+
 static int compare_strings(const void *a, const void *b) {
     return strcmp(*(const char **)a, *(const char **)b);
+}
+
+void register_completion_words(const char *command, const char *wordlist) {
+    // Update existing rule
+    for (int i = 0; i < custom_count; i++) {
+        if (strcmp(custom_completions[i].command, command) == 0) {
+            free(custom_completions[i].wordlist);
+            custom_completions[i].wordlist = strdup(wordlist);
+            return;
+        }
+    }
+    // Add new rule
+    if (custom_count >= custom_capacity) {
+        custom_capacity = custom_capacity == 0 ? 4 : custom_capacity * 2;
+        custom_completions = realloc(custom_completions, custom_capacity * sizeof(CustomCompletion));
+    }
+    custom_completions[custom_count].command = strdup(command);
+    custom_completions[custom_count].wordlist = strdup(wordlist);
+    custom_count++;
 }
 
 static void add_match(char ***matches, int *count, int *capacity, const char *new_match) {
@@ -63,6 +91,27 @@ char **get_autocomplete_matches(const char *buffer, int *match_count, int *prefi
         }
     }
 
+    if (*prefix_pos > 0) {
+        char base_cmd[256] = {0};
+        sscanf(buffer, "%s", base_cmd); // Extract the first word (the command)
+
+        for (int i = 0; i < custom_count; i++) {
+            if (strcmp(custom_completions[i].command, base_cmd) == 0) {
+                char *list_copy = strdup(custom_completions[i].wordlist);
+                char *saveptr;
+                char *token = strtok_r(list_copy, " ", &saveptr);
+                
+                while (token) {
+                    if (strncmp(word, token, word_len) == 0) {
+                        add_match(&matches, &count, &capacity, token);
+                    }
+                    token = strtok_r(NULL, " ", &saveptr);
+                }
+                free(list_copy);
+            }
+        }
+    }
+    
     // 2. File Completion
     char dir_path[1024] = ".";
     char base_prefix[1024];

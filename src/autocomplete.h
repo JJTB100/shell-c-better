@@ -13,4 +13,5 @@ char *get_longest_common_prefix(char **matches, int match_count);
 // Cleans up the matches array.
 void free_autocomplete_matches(char **matches, int match_count);
 
+void register_completion_words(const char *command, const char *wordlist);
 #endif

@@ -1,4 +1,7 @@
 #include "builtins.h"
+#include "shell_context.h"
+#include "autocomplete.h"
+
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -10,6 +13,7 @@ static int builtin_echo(ShellContext *ctx, Command *cmd);
 static int builtin_cd(ShellContext *ctx, Command *cmd);
 static int builtin_type(ShellContext *ctx, Command *cmd);
 static int builtin_pwd(ShellContext *ctx, Command *cmd);
+static int builtin_complete(ShellContext *ctx, Command *cmd);
 
 const BuiltinCommand builtins[] = {
     {"exit", builtin_exit},
@@ -17,6 +21,7 @@ const BuiltinCommand builtins[] = {
     {"cd", builtin_cd},
     {"type", builtin_type},
     {"pwd", builtin_pwd},
+    {"complete", builtin_complete},
     {NULL, NULL}
 };
 
@@ -146,4 +151,17 @@ static int builtin_cd(ShellContext *ctx, Command *cmd) {
     }
     
     return 0; // Success
+}
+
+static int builtin_complete(ShellContext *ctx, Command *cmd) {
+    (void)ctx;
+    
+    // Supports: complete -W "word1 word2" command_name
+    if (cmd->argc >= 4 && strcmp(cmd->argv[1], "-W") == 0) {
+        register_completion_words(cmd->argv[3], cmd->argv[2]);
+        return 0;
+    }
+    
+    fprintf(stderr, "Usage: complete -W \"wordlist\" command\n");
+    return 1;
 }
