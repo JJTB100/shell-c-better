@@ -1,10 +1,13 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include "shell_context.h"
-#include "input.h" 
+#include "line_editor.h"
 
-int main() {
+int main(void) {
+    setbuf(stdout, NULL);
+
     ShellContext ctx;
     shell_context_init(&ctx);
-    terminal_enable_raw_mode(&ctx);
 
     while (ctx.is_running) {
         if (ctx.is_interactive) {
@@ -12,22 +15,18 @@ int main() {
             fflush(stdout);
         }
 
-        // Pass context so read_line can access history and termios
-        char *line = read_line(&ctx); 
-        
+        char *line = read_line(&ctx);
         if (!line) {
             ctx.is_running = false;
             break;
         }
 
-        if (strlen(line) > 0) {
-            // Future: Tokenize(line) -> Parse(tokens) -> Execute(ast, &ctx)
-        }
+        // Future stages: Tokenise, Parse, Execute happen here.
 
         free(line);
     }
 
-    int final_exit = ctx.last_exit_code;
+    int exit_code = ctx.last_exit_code;
     shell_context_destroy(&ctx);
-    return final_exit;
+    return exit_code;
 }
