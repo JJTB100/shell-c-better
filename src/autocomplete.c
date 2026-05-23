@@ -138,6 +138,23 @@ char **get_autocomplete_matches(const char *buffer, int *match_count, int *prefi
     const char *word = buffer + *prefix_pos;
     int word_len = strlen(word);
 
+    // Parse the word immediately preceding the cursor position
+    char prev_word[256] = {0};
+    if (*prefix_pos > 0) {
+        int p = *prefix_pos - 1;
+        while (p > 0 && buffer[p - 1] == ' ') p--; // Skip multiple spaces
+        if (p > 0) {
+            int start = p - 1;
+            while (start >= 0 && buffer[start] != ' ') start--; // Find start of word
+            start++;
+            int len = p - start;
+            if (len > 0 && len < 255) {
+                strncpy(prev_word, &buffer[start], len);
+                prev_word[len] = '\0';
+            }
+        }
+    }
+
     if (*prefix_pos == 0) {
         for (int i = 0; builtins[i].name != NULL; i++) {
             if (strncmp(word, builtins[i].name, word_len) == 0) {
@@ -193,7 +210,9 @@ char **get_autocomplete_matches(const char *buffer, int *match_count, int *prefi
                 } 
                 else if (custom_completions[i].type == COMP_COMMAND) {
                     char sys_cmd[1024];
-                    snprintf(sys_cmd, sizeof(sys_cmd), "%s \"%s\" \"%s\"", custom_completions[i].arg, base_cmd, word);
+                    // Inject base_cmd (argv[1]), word (argv[2]), and prev_word (argv[3])
+                    snprintf(sys_cmd, sizeof(sys_cmd), "%s \"%s\" \"%s\" \"%s\"", 
+                             custom_completions[i].arg, base_cmd, word, prev_word);
                     
                     FILE *fp = popen(sys_cmd, "r");
                     if (fp) {
