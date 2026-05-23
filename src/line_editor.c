@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <sys/stat.h>
 
 // --- Autocomplete Helpers ---
 
@@ -30,60 +31,118 @@ static char* longest_common_prefix(char** names, int names_size) {
     return prefix;
 }
 
-static char **get_all_matches(const char *prefix, int *match_count) {
+// Safely add a match to the dynamic array, preventing duplicates
+static void add_match(char ***matches, int *count, int *capacity, const char *new_match) {
+    for (int i = 0; i < *count; i++) {
+        if (strcmp((*matches)[i], new_match) == 0) return;
+    }
+    if (*count >= *capacity) {
+        *capacity *= 2;
+        *matches = realloc(*matches, *capacity * sizeof(char *));
+    }
+    (*matches)[(*count)++] = strdup(new_match);
+}
+
+// Scans Built-ins, PATH, and Filesystem based on cursor context
+static char **get_all_matches(const char *buffer, int *match_count, int *prefix_pos) {
     int capacity = 10;
     int count = 0;
     char **matches = malloc(capacity * sizeof(char *));
-    int prefix_len = strlen(prefix);
+    
+    // Isolate the current word being typed
+    char *last_space = strrchr(buffer, ' ');
+    *prefix_pos = last_space ? (last_space - buffer) + 1 : 0;
+    const char *word = buffer + *prefix_pos;
+    int word_len = strlen(word);
 
-    // 1. Search Built-ins
-    for (int i = 0; builtins[i].name != NULL; i++) {
-        if (strncmp(prefix, builtins[i].name, prefix_len) == 0) {
-            if (count >= capacity) {
-                capacity *= 2;
-                matches = realloc(matches, capacity * sizeof(char *));
+    // 1. Search Built-ins & PATH (Only if we are completing the first word/command)
+    if (*prefix_pos == 0) {
+        for (int i = 0; builtins[i].name != NULL; i++) {
+            if (strncmp(word, builtins[i].name, word_len) == 0) {
+                add_match(&matches, &count, &capacity, builtins[i].name);
             }
-            matches[count++] = strdup(builtins[i].name);
+        }
+
+        char *path_env = getenv("PATH");
+        if (path_env) {
+            char *path_copy = strdup(path_env);
+            char *saveptr;
+            char *dir = strtok_r(path_copy, ":", &saveptr);
+            
+            while (dir) {
+                DIR *d = opendir(dir);
+                if (d) {
+                    struct dirent *entry;
+                    while ((entry = readdir(d)) != NULL) {
+                        if (strncmp(word, entry->d_name, word_len) == 0 &&
+                            strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+                            add_match(&matches, &count, &capacity, entry->d_name);
+                        }
+                    }
+                    closedir(d);
+                }
+                dir = strtok_r(NULL, ":", &saveptr);
+            }
+            free(path_copy);
         }
     }
 
-    // 2. Search PATH
-    char *path_env = getenv("PATH");
-    if (path_env != NULL) {
-        char *path_copy = strdup(path_env);
-        char *saveptr;
-        char *dir = strtok_r(path_copy, ":", &saveptr);
-
-        while (dir != NULL) {
-            DIR *d = opendir(dir);
-            if (d != NULL) {
-                struct dirent *entry;
-                while ((entry = readdir(d)) != NULL) {
-                    if (strncmp(prefix, entry->d_name, prefix_len) == 0 &&
-                        strcmp(entry->d_name, ".") != 0 &&
-                        strcmp(entry->d_name, "..") != 0) {
-                        
-                        // Prevent duplicates (e.g. built-in and PATH match)
-                        int is_dup = 0;
-                        for(int k=0; k<count; k++) {
-                            if(strcmp(matches[k], entry->d_name) == 0) {
-                                is_dup = 1; break;
-                            }
-                        }
-                        if(is_dup) continue;
-
-                        if (count >= capacity) {
-                            capacity *= 2;
-                            matches = realloc(matches, capacity * sizeof(char *));
-                        }
-                        matches[count++] = strdup(entry->d_name);
-                    }
-                }
-                closedir(d);
-            }
-            dir = strtok_r(NULL, ":", &saveptr);
+    // 2. Search Local Filesystem (Always searched, works for relative paths like src/b)
+    char dir_path[1024] = ".";
+    char base_prefix[1024];
+    strcpy(base_prefix, word);
+    
+    char *last_slash = strrchr(base_prefix, '/');
+    if (last_slash) {
+        *last_slash = '\0'; // Split the directory path from the file prefix
+        if (last_slash == base_prefix) {
+            strcpy(dir_path, "/"); // Absolute root
+        } else {
+            strcpy(dir_path, base_prefix);
         }
-        free(path_copy);
+        
+        // Safely extract the file prefix without memory overlap
+        char temp[1024];
+        strcpy(temp, last_slash + 1);
+        strcpy(base_prefix, temp);
+    }
+
+    DIR *d = opendir(dir_path);
+    if (d) {
+        struct dirent *entry;
+        int base_len = strlen(base_prefix);
+        
+        while ((entry = readdir(d)) != NULL) {
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+            
+            if (strncmp(entry->d_name, base_prefix, base_len) == 0) {
+                char full_match[2048];
+                char stat_path[2048];
+                
+                // Reconstruct the full path strings
+                if (last_slash) {
+                    if (strcmp(dir_path, "/") == 0) {
+                        snprintf(full_match, sizeof(full_match), "/%s", entry->d_name);
+                        snprintf(stat_path, sizeof(stat_path), "/%s", entry->d_name);
+                    } else {
+                        snprintf(full_match, sizeof(full_match), "%s/%s", dir_path, entry->d_name);
+                        snprintf(stat_path, sizeof(stat_path), "%s/%s", dir_path, entry->d_name);
+                    }
+                } else {
+                    strcpy(full_match, entry->d_name);
+                    snprintf(stat_path, sizeof(stat_path), "%s/%s", dir_path, entry->d_name);
+                }
+                
+                // Determine if it's a directory
+                struct stat st;
+                if (stat(stat_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+                    strcat(full_match, "/");
+                }
+                
+                add_match(&matches, &count, &capacity, full_match);
+            }
+        }
+        closedir(d);
     }
 
     qsort(matches, count, sizeof(char *), compare_strings);
@@ -96,7 +155,6 @@ static char **get_all_matches(const char *prefix, int *match_count) {
 // --- Main Reader ---
 
 char *read_line(ShellContext *ctx) {
-    // If running in a test script or piped input, use standard getline
     if (!ctx->is_interactive) {
         char *line = NULL;
         size_t len = 0;
@@ -104,55 +162,56 @@ char *read_line(ShellContext *ctx) {
             free(line);
             return NULL;
         }
-        if (len > 0 && line[strlen(line) - 1] == '\n') {
-            line[strlen(line) - 1] = '\0';
-        }
+        if (len > 0 && line[strlen(line) - 1] == '\n') line[strlen(line) - 1] = '\0';
         return line;
     }
 
-    // --- Interactive Raw Mode Reader ---
     char buffer[1024] = {0};
     int pos = 0;
     char c;
     int tab_count = 0;
 
-    // Read byte-by-byte directly from standard input
     while (read(STDIN_FILENO, &c, 1) == 1) {
         if (c == '\n' || c == '\r') {
             printf("\r\n");
             return strdup(buffer);
         } 
-        else if (c == '\t') { // Tab Completion
+        else if (c == '\t') {
             tab_count++;
             int match_count;
-            char **matches = get_all_matches(buffer, &match_count);
+            int prefix_pos;
+            char **matches = get_all_matches(buffer, &match_count, &prefix_pos);
+            int word_len = pos - prefix_pos; // Length of the word already typed
 
             if (match_count == 0) {
-                printf("\a"); // Bell (No matches)
+                printf("\a"); // Bell
             } 
             else if (match_count == 1) {
-                // Single Match
-                const char *to_add = &matches[0][pos];
+                // Add the remainder of the exact match
+                const char *to_add = &matches[0][word_len];
                 if (strlen(to_add) > 0) {
                     strcat(buffer, to_add);
                     printf("%s", to_add);
                     pos += strlen(to_add);
                 }
-                strcat(buffer, " ");
-                printf(" ");
-                pos++;
+                
+                // Only add a space if the completed match is a file, not a directory
+                if (matches[0][strlen(matches[0]) - 1] != '/') {
+                    strcat(buffer, " ");
+                    printf(" ");
+                    pos++;
+                }
                 tab_count = 0;
             } 
             else {
-                // Multiple Matches
                 char *prefix = longest_common_prefix(matches, match_count);
-                if (strlen(prefix) > (size_t)pos) {
-                    char *suffix = prefix + pos;
+                if (strlen(prefix) > (size_t)word_len) {
+                    char *suffix = prefix + word_len;
                     strcat(buffer, suffix);
                     printf("%s", suffix);
                     pos += strlen(suffix);
                 } else if (tab_count == 1) {
-                    printf("\a"); // Bell on first attempt if prefix can't extend
+                    printf("\a");
                 }
                 
                 if (tab_count == 2) {
@@ -166,23 +225,21 @@ char *read_line(ShellContext *ctx) {
                 free(prefix);
             }
 
-            // Cleanup dynamically allocated match array
             for (int i = 0; i < match_count; i++) free(matches[i]);
             free(matches);
-            
         } 
-        else if (c == 127 || c == '\b') { // Backspace
+        else if (c == 127 || c == '\b') {
             tab_count = 0;
             if (pos > 0) {
                 pos--;
                 buffer[pos] = '\0';
-                printf("\b \b"); // Erase character visually
+                printf("\b \b");
             }
         } 
-        else if (c == 4) { // Ctrl+D (EOF)
+        else if (c == 4) { // Ctrl+D
             if (pos == 0) return NULL;
         } 
-        else if (c >= 32 && c <= 126) { // Standard Printable Characters
+        else if (c >= 32 && c <= 126) {
             tab_count = 0;
             if (pos < 1023) {
                 buffer[pos++] = c;
