@@ -7,7 +7,7 @@
 // --- Forward Declarations ---
 static int builtin_exit(ShellContext *ctx, TokenList *tokens);
 static int builtin_echo(ShellContext *ctx, TokenList *tokens);
-//static int builtin_cd(ShellContext *ctx, TokenList *tokens);
+static int builtin_cd(ShellContext *ctx, TokenList *tokens);
 //static int builtin_history(ShellContext *ctx, TokenList *tokens);
 static int builtin_type(ShellContext *ctx, TokenList *tokens);
 static int builtin_pwd(ShellContext *ctx, TokenList *tokens);
@@ -17,7 +17,7 @@ static int builtin_pwd(ShellContext *ctx, TokenList *tokens);
 static const BuiltinCommand builtins[] = {
     {"exit", builtin_exit},
     {"echo", builtin_echo},
-    {"cd", NULL},
+    {"cd", builtin_cd},
     {"history", NULL},
     {"type", builtin_type},
     {"pwd", builtin_pwd},
@@ -123,4 +123,28 @@ static int builtin_type(ShellContext *ctx, TokenList *tokens) {
     
     free(path_copy);
     return found ? 0 : 1;
+}
+
+static int builtin_cd(ShellContext *ctx, TokenList *tokens) {
+    (void)ctx; // Suppress unused parameter warning
+    
+    const char *path;
+    
+    // Fallback to HOME if no arguments are provided, or if the argument is "~"
+    if (tokens->count < 2 || strcmp(tokens->tokens[1], "~") == 0) {
+        path = getenv("HOME");
+        if (path == NULL) {
+            printf("cd: HOME not set\n");
+            return 1;
+        }
+    } else {
+        path = tokens->tokens[1];
+    }
+    
+    if (chdir(path) != 0) {
+        printf("cd: %s: No such file or directory\n", path);
+        return 1; // failed cd
+    }
+    
+    return 0; // Success
 }
