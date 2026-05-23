@@ -4,6 +4,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <stdio.h>
 
 static int compare_strings(const void *a, const void *b) {
     return strcmp(*(const char **)a, *(const char **)b);
