@@ -40,9 +40,11 @@ void register_completion(const char *command, CompType type, const char *arg) {
     custom_count++;
 }
 
-void print_completions(const char *target_command) {
+bool print_completions(const char *target_command) {
+    bool found = false;
     for (int i = 0; i < custom_count; i++) {
         if (!target_command || strcmp(custom_completions[i].command, target_command) == 0) {
+            found = true;
             if (custom_completions[i].type == COMP_WORDLIST) {
                 printf("complete -W '%s' %s\n", custom_completions[i].arg, custom_completions[i].command);
             } else if (custom_completions[i].type == COMP_COMMAND) {
@@ -54,6 +56,12 @@ void print_completions(const char *target_command) {
             }
         }
     }
+    
+    if (target_command && !found) {
+        printf("complete: %s: no completion specification\n", target_command);
+    }
+    
+    return found;
 }
 
 static void add_match(char ***matches, int *count, int *capacity, const char *new_match) {

@@ -162,8 +162,13 @@ static int builtin_complete(ShellContext *ctx, Command *cmd) {
     }
     
     if (strcmp(cmd->argv[1], "-p") == 0) {
-        if (cmd->argc > 2) print_completions(cmd->argv[2]); 
-        else print_completions(NULL);
+        if (cmd->argc > 2) {
+            if (!print_completions(cmd->argv[2])) {
+                return 1; // Return failure if no spec was found
+            }
+        } else {
+            print_completions(NULL);
+        }
         return 0;
     }
     

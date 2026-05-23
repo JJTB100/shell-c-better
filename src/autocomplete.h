@@ -1,6 +1,8 @@
 #ifndef AUTOCOMPLETE_H
 #define AUTOCOMPLETE_H
 
+#include <stdbool.h>
+
 typedef enum {
     COMP_WORDLIST, // -W
     COMP_COMMAND,  // -C
@@ -13,6 +15,6 @@ char *get_longest_common_prefix(char **matches, int match_count);
 void free_autocomplete_matches(char **matches, int match_count);
 
 void register_completion(const char *command, CompType type, const char *arg);
-void print_completions(const char *target_command);
+bool print_completions(const char *target_command);
 
 #endif
