@@ -13,6 +13,8 @@ int main(void) {
     ShellContext ctx;
     shell_context_init(&ctx);
 
+    terminal_enable_raw_mode(&ctx);
+    
     while (ctx.is_running) {
         if (ctx.is_interactive) {
             printf("$ ");

@@ -11,7 +11,7 @@ static int builtin_cd(ShellContext *ctx, Command *cmd);
 static int builtin_type(ShellContext *ctx, Command *cmd);
 static int builtin_pwd(ShellContext *ctx, Command *cmd);
 
-static const BuiltinCommand builtins[] = {
+const BuiltinCommand builtins[] = {
     {"exit", builtin_exit},
     {"echo", builtin_echo},
     {"cd", builtin_cd},

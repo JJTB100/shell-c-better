@@ -14,5 +14,6 @@ typedef struct {
 
 bool is_builtin(const char *name);
 bool handle_builtin(ShellContext *ctx, Command *cmd);
+extern const BuiltinCommand builtins[];
 
 #endif
