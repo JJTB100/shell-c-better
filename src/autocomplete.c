@@ -8,7 +8,8 @@
 
 typedef struct {
     char *command;
-    char *wordlist;
+    CompType type;
+    char *arg; // Holds either the wordlist string or the generator command string
 } CustomCompletion;
 
 static CustomCompletion *custom_completions = NULL;
@@ -19,12 +20,13 @@ static int compare_strings(const void *a, const void *b) {
     return strcmp(*(const char **)a, *(const char **)b);
 }
 
-void register_completion_words(const char *command, const char *wordlist) {
+void register_completion(const char *command, CompType type, const char *arg) {
     // Update existing rule
     for (int i = 0; i < custom_count; i++) {
         if (strcmp(custom_completions[i].command, command) == 0) {
-            free(custom_completions[i].wordlist);
-            custom_completions[i].wordlist = strdup(wordlist);
+            free(custom_completions[i].arg);
+            custom_completions[i].type = type;
+            custom_completions[i].arg = strdup(arg);
             return;
         }
     }
@@ -34,8 +36,19 @@ void register_completion_words(const char *command, const char *wordlist) {
         custom_completions = realloc(custom_completions, custom_capacity * sizeof(CustomCompletion));
     }
     custom_completions[custom_count].command = strdup(command);
-    custom_completions[custom_count].wordlist = strdup(wordlist);
+    custom_completions[custom_count].type = type;
+    custom_completions[custom_count].arg = strdup(arg);
     custom_count++;
+}
+
+void print_completions(const char *target_command) {
+    for (int i = 0; i < custom_count; i++) {
+        if (!target_command || strcmp(custom_completions[i].command, target_command) == 0) {
+            const char *flag = (custom_completions[i].type == COMP_WORDLIST) ? "-W" : "-C";
+            // Mimic bash 'complete -p' output
+            printf("complete %s '%s' %s\n", flag, custom_completions[i].arg, custom_completions[i].command);
+        }
+    }
 }
 
 static void add_match(char ***matches, int *count, int *capacity, const char *new_match) {
@@ -91,28 +104,51 @@ char **get_autocomplete_matches(const char *buffer, int *match_count, int *prefi
         }
     }
 
+    // 2. Programmable Custom Completions
     if (*prefix_pos > 0) {
         char base_cmd[256] = {0};
         sscanf(buffer, "%s", base_cmd); // Extract the first word (the command)
 
         for (int i = 0; i < custom_count; i++) {
             if (strcmp(custom_completions[i].command, base_cmd) == 0) {
-                char *list_copy = strdup(custom_completions[i].wordlist);
-                char *saveptr;
-                char *token = strtok_r(list_copy, " ", &saveptr);
                 
-                while (token) {
-                    if (strncmp(word, token, word_len) == 0) {
-                        add_match(&matches, &count, &capacity, token);
+                if (custom_completions[i].type == COMP_WORDLIST) {
+                    char *list_copy = strdup(custom_completions[i].arg);
+                    char *saveptr;
+                    char *token = strtok_r(list_copy, " ", &saveptr);
+                    
+                    while (token) {
+                        if (strncmp(word, token, word_len) == 0) {
+                            add_match(&matches, &count, &capacity, token);
+                        }
+                        token = strtok_r(NULL, " ", &saveptr);
                     }
-                    token = strtok_r(NULL, " ", &saveptr);
+                    free(list_copy);
+                } 
+                else if (custom_completions[i].type == COMP_COMMAND) {
+                    char sys_cmd[1024];
+                    // Bash conventionally passes the base command and the current word to the generator
+                    snprintf(sys_cmd, sizeof(sys_cmd), "%s \"%s\" \"%s\"", custom_completions[i].arg, base_cmd, word);
+                    
+                    FILE *fp = popen(sys_cmd, "r");
+                    if (fp) {
+                        char line[1024];
+                        while (fgets(line, sizeof(line), fp)) {
+                            line[strcspn(line, "\r\n")] = '\0'; // Strip trailing newline/carriage return
+                            
+                            // The shell is responsible for filtering the script's output against the current prefix
+                            if (strlen(line) > 0 && strncmp(word, line, word_len) == 0) {
+                                add_match(&matches, &count, &capacity, line);
+                            }
+                        }
+                        pclose(fp);
+                    }
                 }
-                free(list_copy);
             }
         }
     }
     
-    // 2. File Completion
+    // 3. File Completion (Fallback)
     char dir_path[1024] = ".";
     char base_prefix[1024];
     strcpy(base_prefix, word);

@@ -156,12 +156,39 @@ static int builtin_cd(ShellContext *ctx, Command *cmd) {
 static int builtin_complete(ShellContext *ctx, Command *cmd) {
     (void)ctx;
     
-    // Supports: complete -W "word1 word2" command_name
-    if (cmd->argc >= 4 && strcmp(cmd->argv[1], "-W") == 0) {
-        register_completion_words(cmd->argv[3], cmd->argv[2]);
+    // 1. No arguments: Print all specifications
+    if (cmd->argc < 2) {
+        print_completions(NULL);
         return 0;
     }
     
-    fprintf(stderr, "Usage: complete -W \"wordlist\" command\n");
+    // 2. Print Flag (-p)
+    if (strcmp(cmd->argv[1], "-p") == 0) {
+        if (cmd->argc > 2) {
+            print_completions(cmd->argv[2]); // Print specific
+        } else {
+            print_completions(NULL); // Print all
+        }
+        return 0;
+    }
+    
+    // 3. Register Specification (-W or -C)
+    if (cmd->argc >= 4) {
+        CompType type;
+        if (strcmp(cmd->argv[1], "-W") == 0) {
+            type = COMP_WORDLIST;
+        } else if (strcmp(cmd->argv[1], "-C") == 0) {
+            type = COMP_COMMAND;
+        } else {
+            fprintf(stderr, "complete: unsupported flag %s\n", cmd->argv[1]);
+            return 1;
+        }
+        
+        // argv[3] is the target command, argv[2] is the wordlist/generator command
+        register_completion(cmd->argv[3], type, cmd->argv[2]);
+        return 0;
+    }
+    
+    fprintf(stderr, "Usage: complete [-p] | [-W \"wordlist\" command] | [-C \"command\" command]\n");
     return 1;
 }
