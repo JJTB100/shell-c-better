@@ -7,8 +7,8 @@
 // --- Forward Declarations ---
 static int builtin_exit(ShellContext *ctx, TokenList *tokens);
 static int builtin_echo(ShellContext *ctx, TokenList *tokens);
-static int builtin_cd(ShellContext *ctx, TokenList *tokens);
-static int builtin_history(ShellContext *ctx, TokenList *tokens);
+//static int builtin_cd(ShellContext *ctx, TokenList *tokens);
+//static int builtin_history(ShellContext *ctx, TokenList *tokens);
 static int builtin_type(ShellContext *ctx, TokenList *tokens);
 static int builtin_pwd(ShellContext *ctx, TokenList *tokens);
 
@@ -17,8 +17,8 @@ static int builtin_pwd(ShellContext *ctx, TokenList *tokens);
 static const BuiltinCommand builtins[] = {
     {"exit", builtin_exit},
     {"echo", builtin_echo},
-    {"cd", builtin_cd},
-    {"history", builtin_history},
+    {"cd", NULL},
+    {"history", NULL},
     {"type", builtin_type},
     {"pwd", builtin_pwd},
     {NULL, NULL}
