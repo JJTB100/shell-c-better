@@ -1,6 +1,8 @@
 #include "builtins.h"
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
 
 // --- Forward Declarations ---
 static int builtin_exit(ShellContext *ctx, TokenList *tokens);
