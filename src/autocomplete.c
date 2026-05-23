@@ -138,14 +138,13 @@ char **get_autocomplete_matches(const char *buffer, int *match_count, int *prefi
     const char *word = buffer + *prefix_pos;
     int word_len = strlen(word);
 
-    // Parse the word immediately preceding the cursor position
     char prev_word[256] = {0};
     if (*prefix_pos > 0) {
         int p = *prefix_pos - 1;
-        while (p > 0 && buffer[p - 1] == ' ') p--; // Skip multiple spaces
+        while (p > 0 && buffer[p - 1] == ' ') p--; 
         if (p > 0) {
             int start = p - 1;
-            while (start >= 0 && buffer[start] != ' ') start--; // Find start of word
+            while (start >= 0 && buffer[start] != ' ') start--; 
             start++;
             int len = p - start;
             if (len > 0 && len < 255) {
@@ -210,10 +209,16 @@ char **get_autocomplete_matches(const char *buffer, int *match_count, int *prefi
                 } 
                 else if (custom_completions[i].type == COMP_COMMAND) {
                     char sys_cmd[1024];
-                    // Inject base_cmd (argv[1]), word (argv[2]), and prev_word (argv[3])
                     snprintf(sys_cmd, sizeof(sys_cmd), "%s \"%s\" \"%s\" \"%s\"", 
                              custom_completions[i].arg, base_cmd, word, prev_word);
                     
+                    // --- NEW: Set completion environment variables ---
+                    char point_str[32];
+                    snprintf(point_str, sizeof(point_str), "%zu", strlen(buffer));
+                    setenv("COMP_LINE", buffer, 1);
+                    setenv("COMP_POINT", point_str, 1);
+                    // -------------------------------------------------
+
                     FILE *fp = popen(sys_cmd, "r");
                     if (fp) {
                         char line[1024];
@@ -225,6 +230,11 @@ char **get_autocomplete_matches(const char *buffer, int *match_count, int *prefi
                         }
                         pclose(fp);
                     }
+
+                    // --- NEW: Clean up the environment variables ---
+                    unsetenv("COMP_LINE");
+                    unsetenv("COMP_POINT");
+                    // -----------------------------------------------
                 }
                 else if (custom_completions[i].type == COMP_FILE) {
                     generate_fs_matches(&matches, &count, &capacity, word, false);
