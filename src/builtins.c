@@ -5,60 +5,59 @@
 #include <stdio.h>
 
 // --- Forward Declarations ---
-static int builtin_exit(ShellContext *ctx, TokenList *tokens);
-static int builtin_echo(ShellContext *ctx, TokenList *tokens);
-static int builtin_cd(ShellContext *ctx, TokenList *tokens);
-//static int builtin_history(ShellContext *ctx, TokenList *tokens);
-static int builtin_type(ShellContext *ctx, TokenList *tokens);
-static int builtin_pwd(ShellContext *ctx, TokenList *tokens);
+static int builtin_exit(ShellContext *ctx, Command *cmd);
+static int builtin_echo(ShellContext *ctx, Command *cmd);
+static int builtin_cd(ShellContext *ctx, Command *cmd);
+static int builtin_type(ShellContext *ctx, Command *cmd);
+static int builtin_pwd(ShellContext *ctx, Command *cmd);
 
-// --- Dispatch Table ---
-// Add new built-ins here. The NULL sentinel marks the end of the array.
 static const BuiltinCommand builtins[] = {
     {"exit", builtin_exit},
     {"echo", builtin_echo},
     {"cd", builtin_cd},
-    {"history", NULL},
     {"type", builtin_type},
     {"pwd", builtin_pwd},
     {NULL, NULL}
 };
 
-// --- Entry Point ---
-bool handle_builtin(ShellContext *ctx, TokenList *tokens) {
-    if (tokens->count == 0) return false;
+bool is_builtin(const char *name) {
+    for (int i = 0; builtins[i].name != NULL; i++) {
+        if (strcmp(name, builtins[i].name) == 0) return true;
+    }
+    return false;
+}
 
-    const char *cmd = tokens->tokens[0];
+bool handle_builtin(ShellContext *ctx, Command *cmd) {
+    if (cmd->argc == 0) return false;
+    const char *name = cmd->argv[0];
 
     for (int i = 0; builtins[i].name != NULL; i++) {
-        if (strcmp(cmd, builtins[i].name) == 0) {
-            // Execute the built-in and store its return value as the exit code
-            ctx->last_exit_code = builtins[i].handler(ctx, tokens);
+        if (strcmp(name, builtins[i].name) == 0) {
+            ctx->last_exit_code = builtins[i].handler(ctx, cmd);
             return true;
         }
     }
-    
     return false;
 }
 
 // --- Built-in Implementations ---
 
-static int builtin_exit(ShellContext *ctx, TokenList *tokens) {
+static int builtin_exit(ShellContext *ctx, Command *cmd) {
     ctx->is_running = false;
     
     // Support optional exit code argument (e.g., 'exit 0' or 'exit 1')
-    if (tokens->count > 1) {
-        return atoi(tokens->tokens[1]);
+    if (cmd->argc > 1) {
+        return atoi(cmd->argv[1]);
     }
     return 0; // Default success exit code
 }
 
-static int builtin_echo(ShellContext *ctx, TokenList *tokens) {
+static int builtin_echo(ShellContext *ctx, Command *cmd) {
     (void)ctx; // Suppress unused parameter warning
     
-    for (int i = 1; i < tokens->count; i++) {
-        printf("%s", tokens->tokens[i]);
-        if (i < tokens->count - 1) {
+    for (int i = 1; i < cmd->argc; i++) {
+        printf("%s", cmd->argv[i]);
+        if (i < cmd->argc - 1) {
             printf(" ");
         }
     }
@@ -66,9 +65,9 @@ static int builtin_echo(ShellContext *ctx, TokenList *tokens) {
     return 0;
 }
 
-static int builtin_pwd(ShellContext *ctx, TokenList *tokens) {
+static int builtin_pwd(ShellContext *ctx, Command *cmd) {
     (void)ctx;
-    (void)tokens;
+    (void)cmd;
     
     char cwd[1024];
     if (getcwd(cwd, sizeof(cwd)) != NULL) {
@@ -80,11 +79,11 @@ static int builtin_pwd(ShellContext *ctx, TokenList *tokens) {
     }
 }
 
-static int builtin_type(ShellContext *ctx, TokenList *tokens) {
+static int builtin_type(ShellContext *ctx, Command *cmd) {
     (void)ctx;
-    if (tokens->count < 2) return 1;
+    if (cmd->argc < 2) return 1;
     
-    char *target = tokens->tokens[1];
+    char *target = cmd->argv[1];
 
     // 1. Check Builtins
     for (int i = 0; builtins[i].name != NULL; i++) {
@@ -125,20 +124,20 @@ static int builtin_type(ShellContext *ctx, TokenList *tokens) {
     return found ? 0 : 1;
 }
 
-static int builtin_cd(ShellContext *ctx, TokenList *tokens) {
+static int builtin_cd(ShellContext *ctx, Command *cmd) {
     (void)ctx; // Suppress unused parameter warning
     
     const char *path;
     
     // Fallback to HOME if no arguments are provided, or if the argument is "~"
-    if (tokens->count < 2 || strcmp(tokens->tokens[1], "~") == 0) {
+    if (cmd->argc < 2 || strcmp(cmd->argv[1], "~") == 0) {
         path = getenv("HOME");
         if (path == NULL) {
             printf("cd: HOME not set\n");
             return 1;
         }
     } else {
-        path = tokens->tokens[1];
+        path = cmd->argv[1];
     }
     
     if (chdir(path) != 0) {

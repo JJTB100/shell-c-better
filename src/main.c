@@ -4,6 +4,7 @@
 #include "shell_context.h"
 #include "line_editor.h"
 #include "tokeniser.h"
+#include "parser.h"
 #include "executor.h"
 
 int main(void) {
@@ -28,8 +29,9 @@ int main(void) {
             TokenList tokens = tokenize_line(line);
             
             if (tokens.count > 0) {
-                // Skipping parser.c for now; AST is overkill for a single word
-                execute_command(&ctx, &tokens);
+                Command *cmd = parse_tokens(&tokens);
+                execute_command(&ctx, cmd);
+                free_command(cmd);
             }
 
             free_token_list(&tokens);

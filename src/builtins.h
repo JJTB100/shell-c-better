@@ -3,17 +3,16 @@
 
 #include <stdbool.h>
 #include "shell_context.h"
-#include "tokeniser.h"
+#include "parser.h"
 
-// Every built-in function must match this signature
-typedef int (*builtin_fn)(ShellContext *ctx, TokenList *tokens);
+typedef int (*builtin_fn)(ShellContext *ctx, Command *cmd);
 
 typedef struct {
     const char *name;
     builtin_fn handler;
 } BuiltinCommand;
 
-// Evaluates if the command is a built-in, runs it if so, and returns true.
-bool handle_builtin(ShellContext *ctx, TokenList *tokens);
+bool is_builtin(const char *name);
+bool handle_builtin(ShellContext *ctx, Command *cmd);
 
 #endif

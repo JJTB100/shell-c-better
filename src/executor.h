@@ -8,6 +8,6 @@
 #include "shell_context.h"
 #include "tokeniser.h"
 
-void execute_command(ShellContext *ctx, TokenList *tokens);
+void execute_command(ShellContext *ctx, Command *cmd);
 
 #endif
